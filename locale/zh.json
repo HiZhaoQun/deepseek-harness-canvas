@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DeepSeek Harness 画布插件",
+    "description": "把对话变成卡片的模式：每轮回答生成一张卡片，并作为当前问答点的子卡片继续生长。"
+  }
+}

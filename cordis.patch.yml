@@ -1,0 +1,3 @@
+- insert:
+    - id: deepseek-canvas
+      name: 'deepseek-harness-canvas'

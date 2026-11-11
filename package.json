@@ -1,0 +1,54 @@
+{
+  "name": "deepseek-harness-canvas",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Infinite conversation canvas plugin for DeepSeek Harness: every turn becomes a connected card",
+  "license": "Apache-2.0",
+  "author": "HiZhaoQun",
+  "homepage": "https://github.com/HiZhaoQun/deepseek-harness-canvas#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HiZhaoQun/deepseek-harness-canvas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HiZhaoQun/deepseek-harness-canvas/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "canvas",
+    "plugin",
+    "cards"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "locale/*.json",
+    "icon.svg",
+    "assets/**/*"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller"
+      ]
+    }
+  }
+}

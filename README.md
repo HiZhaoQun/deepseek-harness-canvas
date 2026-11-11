@@ -1,0 +1,139 @@
+# DeepSeek Harness 画布插件
+
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](package.json)
+[![DSH Bundle](https://img.shields.io/badge/DeepSeek%20Harness-Bundle-4d6bfe.svg)](package.json)
+
+DeepSeek Harness Canvas 是一个将普通对话变成无限卡片树的 DeepSeek Harness 插件。
+
+它不提供第二个输入框：底部原有的 Harness 输入框是唯一入口，每一轮对话都会生成一张卡片。选中一张卡片后继续提问，新回答会成为该卡片的子卡片，从而形成可继续生长的问答树。
+
+> **English** — DeepSeek Harness Canvas is an open-source plugin for DeepSeek Harness that turns every conversation turn into a card on an infinite canvas. Select a card, ask again, and the answer becomes its child card, so a session grows into a browsable question-answer tree. It ships as a self-contained DSH bundle written in plain ES modules: no build step, no runtime npm dependencies, and no CDN. Licensed under the [Apache License 2.0](LICENSE). Chinese documentation follows; see [安装](#安装) and [开发](#开发) for setup and development.
+
+> 当前版本：`1.0.0`，第一版公开版本。
+
+## 功能
+
+- **对话即画布**：`画布` 是当前会话的另一种视图，不是独立会话。
+- **每轮生成卡片**：发送消息后先创建等待卡片，智能体回答写入该卡片。
+- **父子卡片**：选中父卡片再提问，回答自动成为子卡片，并绘制连接线。
+- **选中文字引用**：在卡片或阅读面板中选中文字，会自动把引用插入底部输入框。
+- **全屏阅读**：双击卡片打开居中阅读面板，以对话形式展示问题和回答。
+- **笔记卡片**：可以创建根笔记或子笔记，笔记也可以作为问答的父卡片。
+- **导入历史**：将当前会话最近若干轮或全部历史导入为线性卡片链。
+- **无限画布**：拖拽平移、`Ctrl/⌘ + 滚轮` 缩放、适应视图。
+- **卡片操作聚合**：引用、阅读、新建子笔记、复制、折叠、删除集中在卡片菜单。
+- **本地持久化**：画布布局和卡片内容保存在浏览器 `localStorage`。
+
+## 安装
+
+本仓库本身就是一个 DeepSeek Harness Bundle，不需要构建，也没有运行时 npm 依赖。
+
+```bash
+git clone https://github.com/HiZhaoQun/deepseek-harness-canvas.git
+```
+
+1. 克隆或下载本仓库（命令见上）。
+2. 在 DeepSeek Harness 的插件管理中，选择“安装本地 Bundle”，指向本目录。
+3. 启用插件并刷新 Harness 页面。
+4. 在会话顶部打开 `画布` 标签。
+
+安装后，Host 端会提供只读静态资源路由：
+
+```text
+/deepseek-canvas/assets/
+```
+
+Client 端注册会话视图：
+
+```text
+conversation.view → deepseek-canvas
+```
+
+## 使用
+
+1. 打开 `画布`。
+2. 不选中任何卡片，直接在底部输入框提问 → 创建根卡片。
+3. 选中一张卡片，再提问 → 新卡片成为它的子卡片。
+4. 在卡片中选中文字 → 引用自动进入输入框，然后输入问题。
+5. 双击卡片 → 打开阅读面板；点击面板外空白处或按 `Esc` 关闭。
+6. 需要导入历史时，使用右侧控制栏的 `导入对话`。
+
+## 目录结构
+
+```text
+deepseek-harness-canvas/
+├── index.js              Host 端：静态资源路由
+├── client.js             Client 端：注册 conversation.view
+├── cordis.patch.yml      Bundle 安装声明
+├── package.json
+├── icon.svg
+├── locale/
+│   ├── en.json
+│   └── zh.json
+└── assets/
+    ├── app.js            画布根视图
+    ├── sessions.js       会话事件观察器
+    ├── store.js          卡片树状态与持久化
+    ├── cards.js          卡片与阅读面板
+    ├── ask.js            控制栏、导入、提示
+    ├── model.js          卡片模型与事件分组
+    ├── markdown.js       Markdown 渲染
+    ├── styles.js         作用域样式
+    ├── icons.js          内联图标
+    ├── locale.js         界面文案
+    └── runtime.js        React 运行时桥接
+```
+
+## 开发
+
+项目是原生 ES Module，没有编译步骤。修改 `assets/` 后刷新页面即可，但浏览器会缓存模块。
+
+如果修改了模块内容，需要同时更新两处版本号：
+
+- `client.js` 中的 `APP_VERSION`
+- `assets/` 内所有相对导入的 `?v=`
+
+两者保持一致后重新安装/同步 Bundle，再刷新页面。
+
+如果新增界面文案，还需要同步更新 `assets/locale.js` 中的 `UI_NS` 版本，避免浏览器复用一个已经注册过的旧字典。
+
+### 事件映射
+
+- `turn/start` 标记当前 Turn。
+- `user/message` 创建等待卡片，`parentId` 取当前选中卡片。
+- `assistant/message` 把最终回答写入卡片。
+- `assistant-stream` 更新流式预览。
+- `turn/end` 结束卡片状态。
+
+### 数据存储
+
+每个 Session 独立存储：
+
+```text
+localStorage["deepseek-canvas:v1:<sessionId>"]
+```
+
+本版本使用新的插件 ID 和存储键，旧版测试画布数据不会自动迁移。
+
+## 边界与限制
+
+- 不同卡片共享当前 Session 历史；分支是视觉和结构上的分支，不是隔离的模型上下文。
+- 只有 `画布` 视图挂载时才会观察会话事件；在 Chat 中发送的消息不会生成卡片。
+- 切换回 Chat 后，已经发出的回答仍会完成对应卡片，但新 Chat 消息不会进入画布。
+- 画布数据保存在当前浏览器；清除站点数据会丢失画布。
+- 当前没有云同步、协作、导出或分支上下文隔离。
+
+## 参与贡献
+
+- 发现 Bug 或有功能建议：提交 [Issue](https://github.com/HiZhaoQun/deepseek-harness-canvas/issues)。
+- 提交代码：Fork 后新建分支，保持现有风格（原生 ES Module、无构建步骤、无运行时依赖），并在 PR 中说明改动的行为和验证方式。
+- 修改 `assets/` 时请同步更新 `client.js` 中的 `APP_VERSION` 与各模块相对导入的 `?v=` 版本号（见上文“开发”）。
+
+## 许可证
+
+本项目以 [Apache License 2.0](LICENSE) 开源发布，版权归 HiZhaoQun 所有，归属声明见 [NOTICE](NOTICE)。
+
+你可以在遵守许可证的前提下自由使用、修改和再分发本项目，包括商业用途。再分发时需随附 `LICENSE` 与 `NOTICE`，保留原有的版权与归属声明，并在修改过的文件中注明改动。
+
+本项目按“现状”提供，不附带任何明示或默示的担保；具体条款以 `LICENSE` 全文为准。
