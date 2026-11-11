@@ -9,7 +9,7 @@
  */
 ;(() => {
 const APP_BASE = '/deepseek-canvas/assets/'
-const APP_VERSION = '1'
+const APP_VERSION = '2'
 
 window.__ModuleLoader__.load({
   id: 'deepseek-harness-canvas',

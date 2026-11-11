@@ -1,7 +1,7 @@
 /** Floating canvas chrome: toolbar, zoom, history import, mode indicator. */
-import { h } from './runtime.js?v=1'
-import { Icon } from './icons.js?v=1'
-import { cardTitle, formatNumber, truncate } from './model.js?v=1'
+import { h } from './runtime.js?v=2'
+import { Icon } from './icons.js?v=2'
+import { cardTitle, formatNumber, truncate } from './model.js?v=2'
 
 function ImportMenu({ store, t }) {
   return h('details', { className: 'dc-import' },

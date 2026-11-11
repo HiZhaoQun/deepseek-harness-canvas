@@ -11,20 +11,20 @@ import {
   useId,
   useRef,
   useSyncExternalStore,
-} from './runtime.js?v=1'
-import { CanvasStore } from './store.js?v=1'
-import { registerUiLocale, useT } from './locale.js?v=1'
-import { CardShell, ReaderOverlay } from './cards.js?v=1'
-import { Icon } from './icons.js?v=1'
+} from './runtime.js?v=2'
+import { CanvasStore } from './store.js?v=2'
+import { registerUiLocale, useT } from './locale.js?v=2'
+import { CardShell, ReaderOverlay } from './cards.js?v=2'
+import { Icon } from './icons.js?v=2'
 import {
   CanvasControls,
   CanvasHint,
   EmptyState,
   ModeBar,
   Toast,
-} from './ask.js?v=1'
-import { CSS } from './styles.js?v=1'
-import { CARD_WIDTH, cardTitle } from './model.js?v=1'
+} from './ask.js?v=2'
+import { CSS } from './styles.js?v=2'
+import { CARD_WIDTH, cardTitle } from './model.js?v=2'
 
 // Kept on globalThis so a client hot reload reuses the same store and
 // observer. A module-local map would leave the old hub alive with an old

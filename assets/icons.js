@@ -1,5 +1,5 @@
 /** Small inline icon set for the canvas. All icons inherit currentColor. */
-import { h } from './runtime.js?v=1'
+import { h } from './runtime.js?v=2'
 
 const PATHS = {
   upload: [

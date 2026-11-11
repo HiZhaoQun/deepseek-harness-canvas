@@ -17,13 +17,37 @@ import {
   quoteBlock,
   truncate,
   uid,
-} from './model.js?v=1'
-import { CanvasSessionHub } from './sessions.js?v=1'
+} from './model.js?v=2'
+import { CanvasSessionHub } from './sessions.js?v=2'
 
 const SAVE_DELAY = 350
+const SCROLL_SURFACES = ['body', 'reader']
 
 function storageKey(sessionId) {
   return `deepseek-canvas:v1:${sessionId}`
+}
+
+/**
+ * Sanitize one card's persisted reading positions. `top` is the pixel offset
+ * that resumes the exact same layout; `ratio` lets a different surface (for
+ * example the full-screen reader opened from a card preview) continue from the
+ * same relative place when no position of its own exists yet.
+ * @param {unknown} raw
+ * @returns {{body?: {top: number, ratio: number}, reader?: {top: number, ratio: number}} | undefined}
+ */
+function normalizeScrollMemory(raw) {
+  if (raw === null || typeof raw !== 'object') return undefined
+  const memory = {}
+  for (const surface of SCROLL_SURFACES) {
+    const value = raw[surface]
+    if (value === null || typeof value !== 'object') continue
+    if (!Number.isFinite(value.top) && !Number.isFinite(value.ratio)) continue
+    memory[surface] = {
+      top: Math.max(0, Number.isFinite(value.top) ? value.top : 0),
+      ratio: clamp(Number.isFinite(value.ratio) ? value.ratio : 0, 0, 1),
+    }
+  }
+  return Object.keys(memory).length > 0 ? memory : undefined
 }
 
 function normalizeCard(raw, fromStorage = false) {
@@ -90,6 +114,7 @@ export class CanvasStore {
     }
     this.size = { width: 1000, height: 700 }
     this.heights = new Map()
+    this.scrolls = new Map()
     this.selection = undefined
     this.lastQuoteCardId = undefined
     this.readerCardId = undefined
@@ -176,6 +201,14 @@ export class CanvasStore {
         .map((card) => normalizeCard(card, true))
         .filter((card) => card !== undefined)
       const viewport = parsed.viewport ?? {}
+      const scrolls = new Map()
+      const storedScrolls = parsed.scrolls
+      if (storedScrolls !== null && typeof storedScrolls === 'object') {
+        for (const card of cards) {
+          const memory = normalizeScrollMemory(storedScrolls[card.id])
+          if (memory !== undefined) scrolls.set(card.id, memory)
+        }
+      }
       this.board = {
         version: BOARD_VERSION,
         viewport: {
@@ -186,6 +219,7 @@ export class CanvasStore {
         cards,
         controlsOpen: parsed.controlsOpen !== false,
       }
+      this.scrolls = scrolls
       return
     }
     this.board = {
@@ -194,6 +228,7 @@ export class CanvasStore {
       cards: [],
       controlsOpen: true,
     }
+    this.scrolls = new Map()
   }
 
   save() {
@@ -202,6 +237,7 @@ export class CanvasStore {
       version: BOARD_VERSION,
       viewport: this.board.viewport,
       cards: this.board.cards,
+      scrolls: Object.fromEntries(this.scrolls),
       controlsOpen: this.controlsOpen,
     })
     try {
@@ -359,6 +395,43 @@ export class CanvasStore {
     if (previous !== undefined && Math.abs(previous - height) < 1.5) return
     this.heights.set(cardId, height)
     this.touchLive()
+  }
+
+  /**
+   * Persisted reading position of one card surface.
+   * @param {string} cardId
+   * @param {'body' | 'reader'} surface
+   * @returns {{top: number, ratio: number} | undefined}
+   */
+  scrollMemory(cardId, surface) {
+    return this.scrolls.get(cardId)?.[surface]
+  }
+
+  /**
+   * Remember where the user stopped reading. This runs from scroll events, so
+   * it deliberately does not bump the revision (that would re-render the whole
+   * board); the debounced board save batches the localStorage write.
+   * @param {string} cardId
+   * @param {'body' | 'reader'} surface
+   * @param {HTMLElement} element - the scroll container.
+   */
+  rememberScroll(cardId, surface, element) {
+    if (this.disposed || typeof cardId !== 'string') return
+    if (element === null || element === undefined) return
+    if (this.cardById(cardId) === undefined) return
+    const top = Number.isFinite(element.scrollTop) ? Math.max(0, element.scrollTop) : 0
+    const max = Math.max(0, (element.scrollHeight ?? 0) - (element.clientHeight ?? 0))
+    const ratio = max > 0 ? clamp(top / max, 0, 1) : 0
+    const entry = this.scrolls.get(cardId) ?? {}
+    const previous = entry[surface]
+    if (previous !== undefined
+      && Math.abs(previous.top - top) < 1
+      && Math.abs(previous.ratio - ratio) < 0.004) {
+      return
+    }
+    entry[surface] = { top, ratio }
+    this.scrolls.set(cardId, entry)
+    this.scheduleSave()
   }
 
   select(cardId) {
@@ -609,6 +682,7 @@ export class CanvasStore {
     if (this.selection === cardId) this.selection = undefined
     if (this.lastQuoteCardId === cardId) this.lastQuoteCardId = undefined
     if (this.readerCardId === cardId) this.readerCardId = undefined
+    this.scrolls.delete(cardId)
     this.touch()
     this.setNotice('卡片已删除', 'info')
   }
@@ -618,6 +692,7 @@ export class CanvasStore {
     this.selection = undefined
     this.lastQuoteCardId = undefined
     this.readerCardId = undefined
+    this.scrolls.clear()
     this.touch()
     this.setNotice('画布已清空', 'info')
   }

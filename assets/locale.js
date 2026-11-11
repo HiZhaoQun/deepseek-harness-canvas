@@ -1,7 +1,7 @@
 /**
  * Localized copy for Canvas mode.
  */
-import { useSyncExternalStore } from './runtime.js?v=1'
+import { useSyncExternalStore } from './runtime.js?v=2'
 
 // Versioned namespace: new keys must not be resolved from an older cached
 // registration of the same namespace.

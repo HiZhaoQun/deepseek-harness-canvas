@@ -5,10 +5,10 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-} from './runtime.js?v=1'
-import { Icon } from './icons.js?v=1'
-import { Markdown, copyText } from './markdown.js?v=1'
-import { CARD_WIDTH, cardTitle, truncate } from './model.js?v=1'
+} from './runtime.js?v=2'
+import { Icon } from './icons.js?v=2'
+import { Markdown, copyText } from './markdown.js?v=2'
+import { CARD_WIDTH, cardTitle, truncate } from './model.js?v=2'
 
 function typeIcon(type) {
   return type === 'note' ? 'note' : 'answer'
@@ -39,6 +39,46 @@ function Spinner({ size = 14 }) {
 function closeDetails(event) {
   const details = event.currentTarget.closest('details')
   if (details !== null) details.open = false
+}
+
+/**
+ * Restore one card surface's reading position after mount and record it while
+ * the user scrolls, so collapsing a card, switching views, or reloading the
+ * page resumes where reading stopped instead of jumping back to the top.
+ *
+ * @param {object} store - canvas store.
+ * @param {string | undefined} cardId
+ * @param {'body' | 'reader'} surface
+ * @param {{top: number, ratio: number} | undefined} seed - fallback position
+ *   used only when this surface has never been scrolled.
+ */
+function useReadingPosition(store, cardId, surface, seed) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (element === null || cardId === undefined) return
+    const max = Math.max(0, element.scrollHeight - element.clientHeight)
+    const memory = store.scrollMemory(cardId, surface)
+    if (memory !== undefined) {
+      if (memory.top > 0) element.scrollTop = Math.min(memory.top, max)
+      return
+    }
+    // A surface that was never scrolled starts from the other surface's
+    // relative position, so "read in full" continues the current reading.
+    if (seed !== undefined && seed.ratio > 0 && max > 0) {
+      element.scrollTop = Math.round(seed.ratio * max)
+    }
+  }, [store, cardId, surface])
+
+  return {
+    ref,
+    onScroll: (event) => {
+      // React can dispatch scroll from a descendant (code blocks, tables);
+      // only the surface's own scroll position is reading progress.
+      if (event.target !== event.currentTarget) return
+      store.rememberScroll(cardId, surface, event.currentTarget)
+    },
+  }
 }
 
 function CardMenu({ store, card, t }) {
@@ -109,12 +149,17 @@ function CardMenu({ store, card, t }) {
   )
 }
 
-function AnswerBody({ card, t }) {
+function AnswerBody({ store, card, t }) {
   const streaming = card.status === 'waiting' || card.status === 'streaming'
   const display = card.status === 'streaming' && card.streamText.length > 0
     ? card.streamText
     : card.content
-  return h('div', { className: 'dc-card-body dc-answer-body dc-scroll' },
+  const reading = useReadingPosition(store, card.id, 'body')
+  return h('div', {
+    ref: reading.ref,
+    onScroll: reading.onScroll,
+    className: 'dc-card-body dc-answer-body dc-scroll',
+  },
     card.question.length > 0 ? h('div', { className: 'dc-question-quote' },
       h('span', { className: 'dc-question-mark' }, 'Q'),
       h('span', null, truncate(card.question, 600)),
@@ -288,13 +333,16 @@ export function CardShell({ store, card, t, zoom }) {
   ),
   card.collapsed ? null : (card.type === 'note'
     ? h(NoteBody, { store, card, t })
-    : h(AnswerBody, { card, t })),
+    : h(AnswerBody, { store, card, t })),
     ),
   )
 }
 
 export function ReaderOverlay({ store, t }) {
   const card = store.readerCardId === undefined ? undefined : store.cardById(store.readerCardId)
+  const cardId = card === undefined ? undefined : card.id
+  const reading = useReadingPosition(store, cardId, 'reader',
+    cardId === undefined ? undefined : store.scrollMemory(cardId, 'body'))
   if (card === undefined) return null
   return h('div', {
     className: 'dc-reader-backdrop',
@@ -309,7 +357,11 @@ export function ReaderOverlay({ store, t }) {
     'aria-label': cardTitle(card, t('card.untitled')),
     'data-card-id': card.id,
   },
-    h('div', { className: 'dc-reader-body dc-scroll' },
+    h('div', {
+      ref: reading.ref,
+      onScroll: reading.onScroll,
+      className: 'dc-reader-body dc-scroll',
+    },
       card.type === 'note'
         ? h('div', { className: 'dc-reader-note' }, card.content.length > 0 ? card.content : t('note.placeholder'))
         : h('div', { className: 'dc-reader-thread' },
