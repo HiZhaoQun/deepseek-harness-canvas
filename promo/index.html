@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>DeepSeek Harness Canvas — 宣传片</title>
+<style>
+  :root{
+    --bg:#06070a;
+    --text:#eef2f8;
+    --muted:#98a2b3;
+    --dim:#6b7686;
+    --accent:#4d6bfe;
+    --accent-soft:#9db4ff;
+    --line:rgba(255,255,255,.09);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+  body{
+    font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC",sans-serif;
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
+  }
+  #stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+
+  /* ---------- background ---------- */
+  .bg{position:absolute;inset:0;background:
+      radial-gradient(1100px 720px at 22% 18%, rgba(77,107,254,.20), transparent 62%),
+      radial-gradient(900px 640px at 84% 82%, rgba(120,80,255,.13), transparent 60%),
+      linear-gradient(180deg,#080a10 0%,#06070a 45%,#05060a 100%)}
+  .grid{position:absolute;inset:-2px;
+    background-image:radial-gradient(rgba(255,255,255,.055) 1.3px, transparent 1.3px);
+    background-size:32px 32px;
+    background-position:center;
+    mask-image:radial-gradient(ellipse 78% 68% at 50% 46%, #000 42%, transparent 100%);
+    -webkit-mask-image:radial-gradient(ellipse 78% 68% at 50% 46%, #000 42%, transparent 100%);
+    opacity:.9}
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 70% 60% at 50% 48%, transparent 46%, rgba(0,0,0,.62) 100%)}
+
+  /* ---------- animation primitives ---------- */
+  .anim{
+    animation-duration:.95s;
+    animation-timing-function:cubic-bezier(.16,1,.3,1);
+    animation-fill-mode:both;
+    animation-play-state:paused;
+    animation-delay:var(--d,0s);
+    animation-name:rise;
+  }
+  @keyframes rise{
+    from{opacity:0;transform:translateY(30px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  @keyframes riseSoft{
+    from{opacity:0;transform:translateY(18px) scale(.985)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+  }
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+  /* ---------- scenes ---------- */
+  .scene{position:absolute;inset:0;opacity:0;visibility:hidden;will-change:opacity}
+
+  /* ---------- shared type ---------- */
+  .eyebrow{
+    font-size:22px;letter-spacing:.2em;color:var(--accent-soft);
+    font-weight:700;text-transform:uppercase;
+  }
+  h1,h2{margin:0;font-weight:700;letter-spacing:-.02em}
+  h1{font-size:100px;line-height:1.2}
+  h2{font-size:68px;line-height:1.28}
+  .grad{
+    background:linear-gradient(96deg,#ffffff 4%,#c7d4ff 46%,#7d9bff 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lead{font-size:30px;line-height:1.8;color:var(--muted);margin:0}
+
+  /* ---------- S1 hook ---------- */
+  .s1-wrap{position:absolute;inset:0;display:grid;place-items:center}
+  .s1-content{width:1320px;text-align:center;margin-top:-20px}
+  .pill{
+    display:inline-flex;align-items:center;gap:12px;
+    padding:13px 26px;border-radius:999px;
+    background:rgba(77,107,254,.12);
+    border:1px solid rgba(123,150,255,.34);
+    color:#cddaff;font-size:23px;font-weight:700;letter-spacing:.06em;
+  }
+  .pill i{width:9px;height:9px;border-radius:50%;background:#88a2ff;box-shadow:0 0 16px #6d8bff}
+  .s1-content h1{margin:40px 0 34px}
+  .s1-content .lead{max-width:1000px;margin:0 auto}
+  .rule{height:2px;width:280px;margin:52px auto 0;border-radius:2px;
+    background:linear-gradient(90deg,transparent,rgba(157,180,255,.9),transparent);
+    animation:ruleGrow 1.2s cubic-bezier(.16,1,.3,1) both;animation-play-state:paused;animation-delay:1.02s;
+  }
+  @keyframes ruleGrow{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+
+  .ghost{
+    position:absolute;border-radius:20px;
+    border:1px solid rgba(255,255,255,.10);
+    background:linear-gradient(155deg,rgba(255,255,255,.09),rgba(255,255,255,.015));
+    box-shadow:0 30px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter:blur(2px);
+  }
+  .ghost::after{content:"";position:absolute;left:22px;right:22px;top:24px;height:10px;border-radius:6px;background:rgba(255,255,255,.14)}
+  .ghost::before{content:"";position:absolute;left:22px;right:64px;top:48px;height:8px;border-radius:6px;background:rgba(255,255,255,.08)}
+  .g-a{width:340px;height:210px;left:118px;top:210px;transform:rotate(-7deg);
+    animation:floatA 9s ease-in-out infinite alternate;animation-play-state:paused}
+  .g-b{width:300px;height:186px;right:146px;top:168px;transform:rotate(6deg);
+    animation:floatB 11s ease-in-out infinite alternate;animation-play-state:paused}
+  .g-c{width:260px;height:160px;right:250px;bottom:120px;transform:rotate(-4deg);opacity:.8;
+    animation:floatA 10s ease-in-out infinite alternate;animation-play-state:paused}
+  @keyframes floatA{from{translate:0 0}to{translate:0 -18px}}
+  @keyframes floatB{from{translate:0 0}to{translate:0 22px}}
+
+  /* ---------- S2 pain ---------- */
+  .stream{
+    position:absolute;right:40px;top:0;width:800px;height:1080px;overflow:hidden;
+    mask-image:linear-gradient(180deg,transparent 0%,#000 16%,#000 80%,transparent 100%);
+    -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 16%,#000 80%,transparent 100%);
+  }
+  .stream-inner{
+    position:absolute;left:0;right:0;top:80px;display:flex;flex-direction:column;gap:18px;
+    animation:scrollUp 9.5s linear both;animation-play-state:paused;
+  }
+  @keyframes scrollUp{from{transform:translateY(0)}to{transform:translateY(-340px)}}
+  .msg{
+    max-width:92%;padding:20px 24px;border-radius:16px;
+    font-size:19px;line-height:1.6;color:#c3ccda;
+    border:1px solid rgba(255,255,255,.07);
+    background:rgba(255,255,255,.035);
+  }
+  .msg.me{align-self:flex-end;max-width:78%;background:rgba(77,107,254,.13);border-color:rgba(123,150,255,.22);color:#d7e0f5}
+  .msg .who{display:block;font-size:14px;letter-spacing:.14em;color:var(--dim);margin-bottom:8px}
+  .msg.lost{border-color:rgba(157,180,255,.55);background:rgba(77,107,254,.10);
+    animation:lostFade 3.4s ease both;animation-play-state:paused;animation-delay:1.2s}
+  @keyframes lostFade{0%{opacity:1}55%{opacity:.45}100%{opacity:.18}}
+
+  .s2-text{position:absolute;left:120px;top:270px;width:880px}
+  .s2-text h2{margin:26px 0 30px}
+  .s2-text .lead{max-width:780px}
+  .note{
+    display:inline-block;margin-top:38px;padding:14px 22px;border-radius:12px;
+    font-size:23px;color:#dfe6f4;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10);
+    border-left:2px solid var(--accent);
+  }
+
+  /* ---------- frames / screenshots ---------- */
+  .frame{
+    position:absolute;border-radius:18px;overflow:hidden;background:#0a0d12;
+    border:1px solid rgba(255,255,255,.13);
+    box-shadow:0 34px 90px rgba(0,0,0,.66), 0 0 130px rgba(77,107,254,.16), inset 0 1px 0 rgba(255,255,255,.06);
+    animation:riseSoft 1.05s cubic-bezier(.16,1,.3,1) both;animation-play-state:paused;
+  }
+  .frame img{display:block;width:100%;height:100%;object-fit:cover;filter:brightness(1.1) contrast(1.03) saturate(1.04)}
+  .kb{animation-fill-mode:both;animation-play-state:paused;animation-timing-function:cubic-bezier(.25,.55,.3,1);animation-duration:var(--kb,9s)}
+
+  /* ---------- S3 cards ---------- */
+  #s3 .frame{left:250px;top:168px;width:1420px;height:719px}
+  @keyframes kbCards{
+    0%{transform:scale(1.01)}
+    58%{transform:scale(1.2)}
+    100%{transform:scale(1.5)}
+  }
+  #s3 .kb{animation-name:kbCards;transform-origin:48% 47%}
+  .s3-head{position:absolute;left:120px;top:78px;display:flex;align-items:center;gap:20px}
+  .s3-num{font-size:22px;font-weight:700;color:#0b0d12;background:var(--accent-soft);
+    width:44px;height:44px;border-radius:12px;display:grid;place-items:center;letter-spacing:0}
+  .s3-foot{position:absolute;left:120px;right:120px;bottom:84px;display:flex;align-items:center;justify-content:space-between;gap:40px}
+  .cap{font-size:29px;color:#dbe3f2;letter-spacing:.01em}
+  .cap b{color:#fff;font-weight:700}
+  .chips{display:flex;gap:12px;flex:0 0 auto}
+  .chip{font-size:20px;color:#c9d4e8;padding:10px 18px;border-radius:999px;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10)}
+
+  /* ---------- S4 / S5 / S6 split ---------- */
+  .split{position:absolute;top:50%;transform:translateY(-50%);width:620px}
+  .split h2{margin:24px 0 26px}
+  .split .lead{font-size:26px;line-height:1.9}
+  .split-left{left:120px}
+  .split-right{right:110px}
+  #s4 .frame{left:760px;top:200px;width:1160px;height:587px}
+  @keyframes kbBranch{
+    0%{transform:scale(1.02)}
+    100%{transform:scale(1.42)}
+  }
+  #s4 .kb{animation-name:kbBranch;transform-origin:34% 48%}
+
+  #s5 .frame{left:210px;top:70px;width:1500px;height:759px}
+  @keyframes kbReader{
+    0%{transform:scale(1.01)}
+    100%{transform:scale(1.17)}
+  }
+  #s5 .kb{animation-name:kbReader;transform-origin:50% 54%}
+  #s5 .cap-block{position:absolute;left:210px;right:180px;bottom:44px}
+  #s5 .cap-block h2{font-size:44px;margin:12px 0 10px}
+  #s5 .cap-block .lead{font-size:25px;line-height:1.7}
+
+  #s6 .frame{left:760px;top:236px;width:1180px;height:597px}
+  @keyframes kbImport{
+    0%{transform:scale(1.02)}
+    100%{transform:scale(1.15)}
+  }
+  #s6 .kb{animation-name:kbImport;transform-origin:94% 50%}
+
+  .tag-row{display:flex;gap:12px;margin-top:30px}
+  .tag-row .chip{font-size:19px}
+
+  /* ---------- S7 CTA ---------- */
+  .s7-wrap{position:absolute;inset:0;display:grid;place-items:center}
+  .s7{width:1360px;text-align:center}
+  .s7 h1{font-size:96px;margin:34px 0 44px}
+  .term{
+    margin:0 auto;width:1120px;border-radius:16px;overflow:hidden;
+    background:rgba(10,13,19,.86);border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 30px 80px rgba(0,0,0,.55);
+    text-align:left;
+  }
+  .term-bar{display:flex;align-items:center;gap:9px;padding:15px 20px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .term-bar i{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.18)}
+  .term-body{padding:30px 34px}
+  .term-line{display:flex;align-items:center;font-family:Consolas,"Cascadia Mono",monospace;font-size:26px;color:#dfe7f6;white-space:nowrap}
+  .dollar{color:var(--accent-soft);margin-right:16px;font-weight:700}
+  .cmd{
+    display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;
+    width:0;max-width:1040px;
+    animation:type 2.1s steps(64,end) both;animation-play-state:paused;animation-delay:.55s;
+  }
+  .cmd em{color:#8fe3c0;font-style:normal}
+  @keyframes type{from{width:0}to{width:100%}}
+  .caret{display:inline-block;width:9px;height:26px;background:rgba(255,255,255,.65);margin-left:4px;
+    animation:fadeIn .5s linear both;animation-play-state:paused;animation-delay:2.5s}
+  .s7 p{margin:44px auto 0;font-size:28px;color:var(--muted)}
+  .s7 p b{color:#e6ecf8;font-weight:700}
+  .s7-foot{margin-top:56px;display:flex;align-items:center;justify-content:center;gap:18px;
+    font-size:22px;color:var(--dim);letter-spacing:.02em}
+  .s7-foot .dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25)}
+  .lic{
+    display:inline-flex;align-items:center;gap:10px;margin-top:30px;
+    font-size:20px;color:#a9b6cc;
+  }
+  .lic span{color:var(--accent-soft);font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div>
+  <div class="grid"></div>
+
+  <!-- 01 hook -->
+  <section class="scene" id="s1">
+    <div class="ghost g-a"></div>
+    <div class="ghost g-b"></div>
+    <div class="ghost g-c"></div>
+    <div class="s1-wrap">
+      <div class="s1-content">
+        <div class="pill anim" style="--d:.12s"><i></i>DeepSeek Harness · 插件</div>
+        <h1 class="anim" style="--d:.34s">把对话，变成<br><span class="grad">一张会生长的卡片树</span></h1>
+        <p class="lead anim" style="--d:.72s">每一轮问答都是一张卡片。选中它，再问一次，就会长出新的分支。</p>
+        <div class="rule"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 pain -->
+  <section class="scene" id="s2">
+    <div class="stream">
+      <div class="stream-inner">
+        <div class="msg me"><span class="who">你</span>先帮我梳理一下这个仓库的结构</div>
+        <div class="msg"><span class="who">Harness</span>目录里有 assets、locale、几个入口文件，我先把入口读一遍…</div>
+        <div class="msg lost"><span class="who">第 3 个话题</span>画布数据是按会话存在 localStorage 里的</div>
+        <div class="msg me"><span class="who">你</span>那如果我想换个分支继续问呢</div>
+        <div class="msg"><span class="who">Harness</span>可以选中卡片再提问，答案会作为子卡片接到下面。</div>
+        <div class="msg me"><span class="who">你</span>顺便把 README 的许可证段落也补一下</div>
+        <div class="msg"><span class="who">Harness</span>已补上 Apache-2.0 说明，并在 NOTICE 里记录归属。</div>
+        <div class="msg me"><span class="who">你</span>等等，回一下刚才那个 localStorage 的细节</div>
+        <div class="msg"><span class="who">Harness</span>好的，我把之前的结论再展开一次…</div>
+      </div>
+    </div>
+    <div class="s2-text">
+      <div class="eyebrow anim" style="--d:.1s">问题</div>
+      <h2 class="anim" style="--d:.26s">聊到第 40 轮，<br>想回到第 3 个话题</h2>
+      <p class="lead anim" style="--d:.6s">只能一路往上翻，或者重开一个会话，把背景再讲一遍。</p>
+      <div class="note anim" style="--d:.95s">一条线性记录，装不下一棵树。</div>
+    </div>
+  </section>
+
+  <!-- 03 cards -->
+  <section class="scene" id="s3">
+    <div class="s3-head">
+      <div class="s3-num anim" style="--d:.08s">01</div>
+      <div class="eyebrow anim" style="--d:.16s">每轮一张卡片</div>
+    </div>
+    <div class="frame anim" style="--d:.22s"><img class="kb" src="media/02.png" alt="每一轮对话生成一张卡片"></div>
+    <div class="s3-foot">
+      <div class="cap anim" style="--d:1.5s"><b>发送即建卡</b>：问题、回答、推理过程和工具调用，都留在同一张卡片里</div>
+      <div class="chips">
+        <span class="chip anim" style="--d:1.75s">流式生成</span>
+        <span class="chip anim" style="--d:1.9s">工具调用</span>
+        <span class="chip anim" style="--d:2.05s">状态标记</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 branch -->
+  <section class="scene" id="s4">
+    <div class="split split-left">
+      <div class="eyebrow anim" style="--d:.12s">02 / 分支</div>
+      <h2 class="anim" style="--d:.28s">选中卡片，<br>再问一次</h2>
+      <p class="lead anim" style="--d:.62s">新的回答成为它的子卡片，两张卡片之间自动连线。想深挖哪条线，就沿着哪条线长。</p>
+      <div class="tag-row">
+        <span class="chip anim" style="--d:1.0s">父子结构</span>
+        <span class="chip anim" style="--d:1.15s">自动连线</span>
+      </div>
+    </div>
+    <div class="frame" style="animation-delay:.2s"><img class="kb" src="media/03.png" alt="父卡片与子卡片"></div>
+  </section>
+
+  <!-- 05 reader + quote -->
+  <section class="scene" id="s5">
+    <div class="frame" style="animation-delay:.2s"><img class="kb" src="media/05.png" alt="全屏阅读与引用"></div>
+    <div class="cap-block">
+      <div class="eyebrow anim" style="--d:.85s">03 / 阅读与引用</div>
+      <h2 class="anim" style="--d:1.0s">双击阅读，选中即引用</h2>
+      <p class="lead anim" style="--d:1.2s">全屏面板按对话形式展开；在卡片里选中文字，引用会带着出处自动进入输入框。</p>
+    </div>
+  </section>
+
+  <!-- 06 import -->
+  <section class="scene" id="s6">
+    <div class="split split-left">
+      <div class="eyebrow anim" style="--d:.12s">04 / 历史</div>
+      <h2 class="anim" style="--d:.28s">旧对话，<br>一键成链</h2>
+      <p class="lead anim" style="--d:.62s">最近 20 轮或全部历史，按时间顺序导入成卡片链，接着往下问。</p>
+      <div class="tag-row">
+        <span class="chip anim" style="--d:1.0s">最近 20 轮</span>
+        <span class="chip anim" style="--d:1.15s">全部历史</span>
+      </div>
+    </div>
+    <div class="frame" style="animation-delay:.2s"><img class="kb" src="media/04.png" alt="导入历史对话"></div>
+  </section>
+
+  <!-- 07 CTA -->
+  <section class="scene" id="s7">
+    <div class="s7-wrap">
+      <div class="s7">
+        <div class="lic anim" style="--d:.1s"><span>●</span> 开源 · Apache-2.0 · v1.0.0</div>
+        <h1 class="anim" style="--d:.26s">现在就<span class="grad">装上</span></h1>
+        <div class="term anim" style="--d:.5s">
+          <div class="term-bar"><i></i><i></i><i></i></div>
+          <div class="term-body">
+            <div class="term-line"><span class="dollar">$</span><span class="cmd">git clone https://github.com/HiZhaoQun/deepseek-harness-canvas.git</span><span class="caret"></span></div>
+          </div>
+        </div>
+        <p class="anim" style="--d:1.05s">Harness 插件管理 → <b>安装本地 Bundle</b> → 打开「画布」</p>
+        <div class="s7-foot anim" style="--d:1.3s">
+          <span>DeepSeek Harness Canvas</span><span class="dot"></span><span>github.com/HiZhaoQun</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="vignette"></div>
+</div>
+
+<script>
+  // 场景时间轴（秒）。渲染器调用 window.__seek(t) 把每个场景内部所有 CSS 动画定位到该时刻。
+  const SCENES = [
+    { id: 's1', start: 0.0,  end: 7.2  },
+    { id: 's2', start: 7.2,  end: 15.4 },
+    { id: 's3', start: 15.4, end: 24.6 },
+    { id: 's4', start: 24.6, end: 34.2 },
+    { id: 's5', start: 34.2, end: 42.6 },
+    { id: 's6', start: 42.6, end: 48.4 },
+    { id: 's7', start: 48.4, end: 55.0 }
+  ]
+  const FADE = 0.55
+  const elements = new Map()
+  for (const scene of SCENES) {
+    const el = document.getElementById(scene.id)
+    elements.set(scene.id, { el, scene, animations: el.getAnimations({ subtree: true }) })
+  }
+
+  function seek(t) {
+    for (const { el, scene, animations } of elements.values()) {
+      const a = scene.start - FADE
+      const b = scene.end + FADE
+      let opacity = 0
+      if (t > a && t < b) {
+        opacity = Math.min(1, (t - a) / FADE, (b - t) / FADE)
+      }
+      el.style.opacity = String(opacity)
+      el.style.visibility = opacity > 0.001 ? 'visible' : 'hidden'
+      const local = Math.max(0, (t - scene.start) * 1000)
+      for (const animation of animations) {
+        animation.currentTime = local
+      }
+    }
+  }
+
+  window.__seek = seek
+  window.__duration = SCENES[SCENES.length - 1].end
+
+  // 等字体和图片就绪再让渲染器开始截帧。
+  window.__readyPromise = (async () => {
+    const images = Array.from(document.images)
+    await Promise.all(images.map((img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve())))
+    if (document.fonts && document.fonts.ready) await document.fonts.ready
+    seek(0)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    return true
+  })()
+</script>
+</body>
+</html>
