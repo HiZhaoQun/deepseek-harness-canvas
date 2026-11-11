@@ -33,6 +33,7 @@
     "README.md",
     "LICENSE",
     "NOTICE",
+    "docs/images/*",
     "locale/*.json",
     "icon.svg",
     "assets/**/*"

@@ -12,6 +12,8 @@ DeepSeek Harness Canvas 是一个将普通对话变成无限卡片树的 DeepSee
 
 > 当前版本：`1.0.0`，第一版公开版本。
 
+![画布模式：选中父卡片继续提问，回答成为它的子卡片](docs/images/03-parent-child-cards.png)
+
 ## 功能
 
 - **对话即画布**：`画布` 是当前会话的另一种视图，不是独立会话。
@@ -24,6 +26,20 @@ DeepSeek Harness Canvas 是一个将普通对话变成无限卡片树的 DeepSee
 - **无限画布**：拖拽平移、`Ctrl/⌘ + 滚轮` 缩放、适应视图。
 - **卡片操作聚合**：引用、阅读、新建子笔记、复制、折叠、删除集中在卡片菜单。
 - **本地持久化**：画布布局和卡片内容保存在浏览器 `localStorage`。
+
+## 界面预览
+
+以下截图来自插件在 DeepSeek Harness 桌面端 `画布` 视图中的实际运行界面。
+
+| 打开画布：空状态 | 第一个问题生成根卡片 |
+| --- | --- |
+| ![打开画布后的空状态，右侧为控制栏，底部仍是 Harness 原有的输入框](docs/images/01-empty-canvas.png) | ![发送第一个问题后生成的根卡片，卡片内含问题与回答](docs/images/02-conversation-card.png) |
+
+| 导入历史对话 | 放大阅读并引用提问 |
+| --- | --- |
+| ![右侧控制栏展开「导入对话」，可选最近 20 轮或全部历史](docs/images/04-import-history.png) | ![双击卡片打开全屏阅读面板，卡片中的引用已自动填入底部输入框](docs/images/05-reader-and-quote.png) |
+
+选中一张卡片后再提问，回答会成为它的子卡片，两张卡片之间自动画出连线——这就是顶部主图展示的效果。
 
 ## 安装
 
@@ -68,6 +84,10 @@ deepseek-harness-canvas/
 ├── cordis.patch.yml      Bundle 安装声明
 ├── package.json
 ├── icon.svg
+├── LICENSE               Apache-2.0 许可证全文
+├── NOTICE                版权与归属声明
+├── docs/
+│   └── images/           README 截图
 ├── locale/
 │   ├── en.json
 │   └── zh.json
