@@ -3,6 +3,14 @@
  */
 
 export const CARD_WIDTH = 472
+// Collapsed card: title only, 4:3.
+export const CARD_HEIGHT = 354
+// Gap between cards on the preset lattice.
+export const CARD_GAP = 64
+// Expanded card: two collapsed cards plus the gap between them, so it occupies
+// exactly a 2x2 block of preset slots.
+export const EXPANDED_WIDTH = CARD_WIDTH * 2 + CARD_GAP
+export const EXPANDED_HEIGHT = CARD_HEIGHT * 2 + CARD_GAP
 export const CARD_MIN_ZOOM = 0.25
 export const CARD_MAX_ZOOM = 2.5
 export const BOARD_VERSION = 2
@@ -38,7 +46,7 @@ export function cardTitle(card, fallback = 'Untitled') {
   if (card === undefined || card === null) return fallback
   if (typeof card.title === 'string' && card.title.trim().length > 0) return card.title.trim()
   if (card.type === 'answer' && typeof card.question === 'string') {
-    return truncate(card.question.trim(), 80) || fallback
+    return card.question.trim() || fallback
   }
   return fallback
 }
@@ -169,4 +177,70 @@ export function freePosition(cards, x, y, width = CARD_WIDTH) {
     candidateX += 36
   }
   return { x: candidateX, y: candidateY }
+}
+
+/**
+ * Preset tile slots used when snapping is enabled. A collapsed card fills one
+ * slot; an expanded card fills a 2x2 block of slots including the gap between
+ * the two columns and the two rows.
+ */
+export const SLOT_ORIGIN_X = 72
+export const SLOT_ORIGIN_Y = 72
+export const SLOT_COLUMN_STEP = CARD_WIDTH + CARD_GAP
+export const SLOT_ROW_STEP = CARD_HEIGHT + CARD_GAP
+
+export function slotXAt(column) {
+  return SLOT_ORIGIN_X + column * SLOT_COLUMN_STEP
+}
+
+export function slotYAt(row) {
+  return SLOT_ORIGIN_Y + row * SLOT_ROW_STEP
+}
+
+export function slotColumnAt(x) {
+  return Math.round((x - SLOT_ORIGIN_X) / SLOT_COLUMN_STEP)
+}
+
+export function slotRowAt(y) {
+  return Math.round((y - SLOT_ORIGIN_Y) / SLOT_ROW_STEP)
+}
+
+/**
+ * Footprint of a card. Collapsed cards are one 4:3 slot; expanded cards span a
+ * 2x2 slot block.
+ * @param {{collapsed?: boolean}} card
+ * @returns {number}
+ */
+export function cardWidth(card) {
+  return card?.collapsed === false ? EXPANDED_WIDTH : CARD_WIDTH
+}
+
+/**
+ * @param {{collapsed?: boolean}} card
+ * @returns {number}
+ */
+export function cardHeight(card) {
+  return card?.collapsed === false ? EXPANDED_HEIGHT : CARD_HEIGHT
+}
+
+/**
+ * Plain-text snippet for the collapsed 4:3 card. Markdown syntax is mostly
+ * stripped and long content is cut before React touches the DOM.
+ * @param {string} text
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function plainPreview(text, max = 600) {
+  const value = String(text ?? '').slice(0, 4_000)
+    .replace(/```[\w-]*\s*/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return truncate(value, max)
 }

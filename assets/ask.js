@@ -1,7 +1,7 @@
 /** Floating canvas chrome: toolbar, zoom, history import, mode indicator. */
-import { h } from './runtime.js?v=2'
-import { Icon } from './icons.js?v=2'
-import { cardTitle, formatNumber, truncate } from './model.js?v=2'
+import { h } from './runtime.js?v=6'
+import { Icon } from './icons.js?v=6'
+import { cardTitle, formatNumber, truncate } from './model.js?v=6'
 
 function ImportMenu({ store, t }) {
   return h('details', { className: 'dc-import' },
@@ -33,6 +33,25 @@ function ImportMenu({ store, t }) {
         },
       }, t('toolbar.importAll')),
     ),
+  )
+}
+
+function SwitchRow({ icon, label, checked, onChange }) {
+  return h('button', {
+    type: 'button',
+    className: 'dc-tool-button dc-controls-button dc-switch-row',
+    role: 'switch',
+    'aria-checked': checked,
+    title: label,
+    onClick: onChange,
+  },
+  h(Icon, { name: icon, size: 15 }),
+  h('span', { className: 'dc-switch-label' }, label),
+  h('span', {
+    className: 'dc-switch',
+    'data-on': checked ? 'true' : 'false',
+    'aria-hidden': true,
+  }, h('span', { className: 'dc-switch-knob' })),
   )
 }
 
@@ -68,6 +87,18 @@ export function CanvasControls({ store, t }) {
       className: 'dc-tool-button dc-controls-button',
       onClick: () => store.addNote(),
     }, h(Icon, { name: 'note', size: 15 }), h('span', null, t('toolbar.note'))),
+    h(SwitchRow, {
+      icon: 'collapse',
+      label: t('toolbar.collapseAll'),
+      checked: store.collapseAll,
+      onChange: () => store.setCollapseAll(!store.collapseAll),
+    }),
+    h(SwitchRow, {
+      icon: 'grid',
+      label: t('toolbar.snap'),
+      checked: store.snapToGrid,
+      onChange: () => store.setSnapToGrid(!store.snapToGrid),
+    }),
     h('button', {
       type: 'button',
       className: 'dc-tool-button dc-controls-button',

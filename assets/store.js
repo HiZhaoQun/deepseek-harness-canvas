@@ -7,18 +7,28 @@
  */
 import {
   BOARD_VERSION,
+  CARD_GAP,
+  CARD_HEIGHT,
   CARD_MAX_ZOOM,
   CARD_MIN_ZOOM,
   CARD_WIDTH,
+  EXPANDED_HEIGHT,
+  EXPANDED_WIDTH,
+  cardHeight,
   cardTitle,
+  cardWidth,
   clamp,
   freePosition,
   groupHistory,
   quoteBlock,
+  slotColumnAt,
+  slotRowAt,
+  slotXAt,
+  slotYAt,
   truncate,
   uid,
-} from './model.js?v=2'
-import { CanvasSessionHub } from './sessions.js?v=2'
+} from './model.js?v=6'
+import { CanvasSessionHub } from './sessions.js?v=6'
 
 const SAVE_DELAY = 350
 const SCROLL_SURFACES = ['body', 'reader']
@@ -56,7 +66,9 @@ function normalizeCard(raw, fromStorage = false) {
   const normalized = {
     id: typeof raw.id === 'string' ? raw.id : uid('card'),
     type,
-    title: typeof raw.title === 'string' ? raw.title : '',
+    // Answer cards derive their title from the full question; storing a
+    // truncated copy was cutting the visible title short.
+    title: type === 'answer' ? '' : (typeof raw.title === 'string' ? raw.title : ''),
     question: typeof raw.question === 'string' ? raw.question : '',
     content: typeof raw.content === 'string' ? raw.content : '',
     reasoning: typeof raw.reasoning === 'string' ? raw.reasoning : '',
@@ -111,13 +123,15 @@ export class CanvasStore {
       viewport: { x: 0, y: 0, zoom: 1 },
       cards: [],
       controlsOpen: true,
+      collapseAll: true,
+      snapToGrid: true,
     }
     this.size = { width: 1000, height: 700 }
-    this.heights = new Map()
     this.scrolls = new Map()
     this.selection = undefined
     this.lastQuoteCardId = undefined
     this.readerCardId = undefined
+    this.draggingCardId = undefined
     this.notice = undefined
     this.helpOpen = false
     this.importing = false
@@ -153,6 +167,64 @@ export class CanvasStore {
     this.touch()
   }
 
+  /** Global collapse mode: all cards collapsed, and new answer cards too. */
+  get collapseAll() {
+    return this.board.collapseAll !== false
+  }
+
+  /**
+   * Collapse or expand every card and remember the choice for new cards.
+   * Collapsing is position-preserving; expanding gives every card a free 2x2
+   * block so collapsed and expanded cards coexist on the same lattice.
+   * @param {boolean} value
+   */
+  setCollapseAll(value) {
+    const next = value === true
+    if (this.collapseAll === next) return
+    this.board.collapseAll = next
+    if (next === false && this.snapToGrid && this.cards.length > 0) {
+      const ordered = [...this.cards].sort((left, right) => (left.y - right.y) || (left.x - right.x))
+      const placed = []
+      for (const card of ordered) {
+        card.collapsed = false
+        const anchor = this.nearestFreeAnchor(
+          card.x,
+          card.y,
+          EXPANDED_WIDTH,
+          EXPANDED_HEIGHT,
+          undefined,
+          placed,
+        )
+        card.x = anchor.x
+        card.y = anchor.y
+        placed.push(card)
+      }
+      this.touch()
+      return
+    }
+    for (const card of this.cards) card.collapsed = next
+    this.touch()
+  }
+
+  /** Whether new cards and drops snap to the preset grid. */
+  get snapToGrid() {
+    return this.board.snapToGrid !== false
+  }
+
+  /**
+   * Turn magnetic grid snapping on or off. Turning it on also lays the current
+   * cards out on the nearest preset slots; turning it off leaves positions as
+   * they are so free dragging works again.
+   * @param {boolean} value
+   */
+  setSnapToGrid(value) {
+    const next = value === true
+    if (this.snapToGrid === next) return
+    this.board.snapToGrid = next
+    if (next) this.alignToSlots()
+    else this.touch()
+  }
+
   setInputActions(inputActions) {
     this.inputActions = inputActions
   }
@@ -172,6 +244,10 @@ export class CanvasStore {
   async activate() {
     if (!this.loaded) {
       this.load()
+      // Cards are uniform 4:3 tiles now. Existing boards may still hold
+      // positions from the old variable-height layout, so align them once on
+      // first open when snapping is on.
+      if (this.snapToGrid) this.alignToSlots()
       this.loaded = true
       this.active = true
       this.touch(false)
@@ -185,6 +261,7 @@ export class CanvasStore {
   deactivate() {
     if (!this.loaded || this.disposed) return
     this.active = false
+    this.draggingCardId = undefined
     this.touch(false)
   }
 
@@ -209,6 +286,12 @@ export class CanvasStore {
           if (memory !== undefined) scrolls.set(card.id, memory)
         }
       }
+      // Boards saved before the collapse switch existed start collapsed, which
+      // also keeps their first load cheap: no live streaming re-renders.
+      const legacyCollapse = parsed.collapseAll === undefined
+      if (legacyCollapse) {
+        for (const card of cards) card.collapsed = true
+      }
       this.board = {
         version: BOARD_VERSION,
         viewport: {
@@ -218,6 +301,8 @@ export class CanvasStore {
         },
         cards,
         controlsOpen: parsed.controlsOpen !== false,
+        collapseAll: parsed.collapseAll !== false,
+        snapToGrid: parsed.snapToGrid !== false,
       }
       this.scrolls = scrolls
       return
@@ -227,6 +312,8 @@ export class CanvasStore {
       viewport: { x: 0, y: 0, zoom: 1 },
       cards: [],
       controlsOpen: true,
+      collapseAll: true,
+      snapToGrid: true,
     }
     this.scrolls = new Map()
   }
@@ -239,6 +326,8 @@ export class CanvasStore {
       cards: this.board.cards,
       scrolls: Object.fromEntries(this.scrolls),
       controlsOpen: this.controlsOpen,
+      collapseAll: this.collapseAll,
+      snapToGrid: this.snapToGrid,
     })
     try {
       localStorage.setItem(storageKey(this.sessionId), payload)
@@ -368,10 +457,11 @@ export class CanvasStore {
     let maxX = -Infinity
     let maxY = -Infinity
     for (const card of this.board.cards) {
-      const height = this.heights.get(card.id) ?? 260
+      const width = cardWidth(card)
+      const height = cardHeight(card)
       minX = Math.min(minX, card.x)
       minY = Math.min(minY, card.y)
-      maxX = Math.max(maxX, card.x + (card.width ?? CARD_WIDTH))
+      maxX = Math.max(maxX, card.x + width)
       maxY = Math.max(maxY, card.y + height)
     }
     const padding = 120
@@ -390,11 +480,149 @@ export class CanvasStore {
     this.touch(true)
   }
 
-  setHeight(cardId, height) {
-    const previous = this.heights.get(cardId)
-    if (previous !== undefined && Math.abs(previous - height) < 1.5) return
-    this.heights.set(cardId, height)
-    this.touchLive()
+  /**
+   * Whether a footprint at (x, y) is free, ignoring one card and optionally
+   * only checking a subset of cards (used while re-aligning the board).
+   * @param {number} x
+   * @param {number} y
+   * @param {number} width
+   * @param {number} height
+   * @param {string | undefined} ignoreId
+   * @param {Array<object>} [cards]
+   * @returns {boolean}
+   */
+  footprintFree(x, y, width, height, ignoreId, cards = this.cards) {
+    for (const card of cards) {
+      if (card.id === ignoreId) continue
+      const otherWidth = cardWidth(card)
+      const otherHeight = cardHeight(card)
+      if (x < card.x + otherWidth && x + width > card.x
+        && y < card.y + otherHeight && y + height > card.y) {
+        return false
+      }
+    }
+    return true
+  }
+
+  /**
+   * Nearest free preset anchor for a footprint. Rings are searched outward so
+   * the magnetic target is the closest available position.
+   * @param {number} desiredX
+   * @param {number} desiredY
+   * @param {number} width
+   * @param {number} height
+   * @param {string | undefined} ignoreId
+   * @param {Array<object>} [cards]
+   * @returns {{x: number, y: number}}
+   */
+  nearestFreeAnchor(desiredX, desiredY, width, height, ignoreId, cards = this.cards) {
+    const column = slotColumnAt(desiredX)
+    const row = slotRowAt(desiredY)
+    for (let radius = 0; radius <= 20; radius += 1) {
+      let best
+      let bestDistance = Infinity
+      for (let dc = -radius; dc <= radius; dc += 1) {
+        for (let dr = -radius; dr <= radius; dr += 1) {
+          if (Math.max(Math.abs(dc), Math.abs(dr)) !== radius) continue
+          const x = slotXAt(column + dc)
+          const y = slotYAt(row + dr)
+          if (!this.footprintFree(x, y, width, height, ignoreId, cards)) continue
+          const distance = (x - desiredX) ** 2 + (y - desiredY) ** 2
+          if (distance < bestDistance) {
+            bestDistance = distance
+            best = { x, y }
+          }
+        }
+      }
+      if (best !== undefined) return best
+    }
+    return { x: slotXAt(column), y: slotYAt(row) }
+  }
+
+  /**
+   * Position for a new card: below its parent, or near the viewport centre for
+   * a root card. Free placement is used when snapping is off.
+   * @param {object | undefined} parent
+   * @param {boolean} collapsed
+   * @returns {{x: number, y: number}}
+   */
+  placementFor(parent, collapsed) {
+    if (!this.snapToGrid) {
+      if (parent !== undefined) return this.childPosition(parent)
+      const center = this.viewportCenter()
+      return freePosition(this.cards, center.x, center.y)
+    }
+    const width = collapsed ? CARD_WIDTH : EXPANDED_WIDTH
+    const height = collapsed ? CARD_HEIGHT : EXPANDED_HEIGHT
+    if (parent !== undefined) {
+      return this.nearestFreeAnchor(
+        parent.x,
+        parent.y + cardHeight(parent) + CARD_GAP,
+        width,
+        height,
+        undefined,
+      )
+    }
+    const center = this.viewportCenter()
+    return this.nearestFreeAnchor(center.x, center.y, width, height, undefined)
+  }
+
+  /**
+   * Snap one card to the nearest free preset anchor; called after a drag ends.
+   * @param {string} cardId
+   */
+  snapCard(cardId) {
+    if (!this.snapToGrid) return
+    const card = this.cardById(cardId)
+    if (card === undefined) return
+    const anchor = this.nearestFreeAnchor(
+      card.x,
+      card.y,
+      cardWidth(card),
+      cardHeight(card),
+      card.id,
+    )
+    if (Math.abs(anchor.x - card.x) < 1 && Math.abs(anchor.y - card.y) < 1) return
+    card.x = anchor.x
+    card.y = anchor.y
+    this.touch()
+  }
+
+  /**
+   * Move every card onto a free preset anchor, preserving reading order.
+   * Mixed collapsed and expanded cards are supported.
+   */
+  alignToSlots() {
+    if (this.disposed) return
+    if (this.snapToGrid && this.cards.length > 0) {
+      const ordered = [...this.cards].sort((left, right) => (left.y - right.y) || (left.x - right.x))
+      const placed = []
+      for (const card of ordered) {
+        const anchor = this.nearestFreeAnchor(
+          card.x,
+          card.y,
+          cardWidth(card),
+          cardHeight(card),
+          undefined,
+          placed,
+        )
+        card.x = anchor.x
+        card.y = anchor.y
+        placed.push(card)
+      }
+    }
+    this.touch()
+  }
+
+  /**
+   * Card being dragged, so the board can show the preset slot grid.
+   * @param {string | undefined} cardId
+   */
+  setDraggingCard(cardId) {
+    const next = typeof cardId === 'string' ? cardId : undefined
+    if (this.draggingCardId === next) return
+    this.draggingCardId = next
+    this.touch(false)
   }
 
   /**
@@ -489,6 +717,30 @@ export class CanvasStore {
     this.touch()
   }
 
+  /**
+   * Collapse or expand one card. Expanding needs a free 2x2 block, so the card
+   * may move to the nearest free one; collapsing keeps its position.
+   * @param {string} cardId
+   * @param {boolean} collapsed
+   */
+  setCardCollapsed(cardId, collapsed) {
+    const card = this.cardById(cardId)
+    if (card === undefined || card.collapsed === collapsed) return
+    if (collapsed === false && this.snapToGrid) {
+      const anchor = this.nearestFreeAnchor(
+        card.x,
+        card.y,
+        EXPANDED_WIDTH,
+        EXPANDED_HEIGHT,
+        card.id,
+      )
+      card.x = anchor.x
+      card.y = anchor.y
+    }
+    card.collapsed = collapsed
+    this.touch()
+  }
+
   updateCardLive(cardId, patch) {
     const card = this.cardById(cardId)
     if (card === undefined) return
@@ -499,18 +751,18 @@ export class CanvasStore {
   createQuestionCard({ question, requestId, parentId }) {
     const resolvedParentId = typeof parentId === 'string' ? parentId : this.lastQuoteCardId
     const parent = typeof resolvedParentId === 'string' ? this.cardById(resolvedParentId) : undefined
-    const position = parent === undefined
-      ? freePosition(this.board.cards, this.viewportCenter().x, this.viewportCenter().y)
-      : this.childPosition(parent)
+    const collapsed = this.collapseAll
+    const position = this.placementFor(parent, collapsed)
     const card = this.addCard({
       type: 'answer',
-      title: truncate(question, 90),
+      title: '',
       question,
       content: '',
       reasoning: '',
       parentId: parent?.id ?? null,
       requestId,
       status: 'waiting',
+      collapsed,
       x: position.x,
       y: position.y,
     })
@@ -521,15 +773,27 @@ export class CanvasStore {
   }
 
   markAnswerTurn(cardId, turn) {
-    this.updateCardLive(cardId, { turn })
+    this.updateAnswerCard(cardId, { turn }, true)
   }
 
+  /**
+   * Update an answer card from the Session stream. A collapsed card has no
+   * visible live surface, so content chunks update it silently: no board
+   * re-render and no storage write per chunk. Status and tool activity still
+   * emit once so the collapsed header stays truthful.
+   */
   updateAnswerCard(cardId, patch, live = false) {
     const card = this.cardById(cardId)
     if (card === undefined) return
+    const statusChanged = 'status' in patch && patch.status !== card.status
+    const activityChanged = 'activity' in patch && patch.activity !== card.activity
     Object.assign(card, patch)
-    if (live) this.touchLive()
-    else this.touch()
+    if (!live) {
+      this.touch()
+      return
+    }
+    if (card.collapsed && !statusChanged && !activityChanged) return
+    this.touchLive()
   }
 
   finishAnswerCard(cardId, { content, reasoning, status, error, note }) {
@@ -549,15 +813,16 @@ export class CanvasStore {
 
   addNote(parentId = this.selection) {
     const parent = typeof parentId === 'string' ? this.cardById(parentId) : undefined
-    const position = parent === undefined
-      ? freePosition(this.board.cards, this.viewportCenter().x, this.viewportCenter().y)
-      : this.childPosition(parent)
+    // A note is created to be typed into, so it starts expanded even when the
+    // global collapse switch is on.
+    const position = this.placementFor(parent, false)
     const card = this.addCard({
       type: 'note',
       title: '',
       content: '',
       parentId: parent?.id ?? null,
       status: 'done',
+      collapsed: false,
       x: position.x,
       y: position.y,
     })
@@ -581,7 +846,10 @@ export class CanvasStore {
     if (typeof cardId === 'string') this.lastQuoteCardId = cardId
     const body = truncate(String(text ?? '').trim(), 4_000)
     if (body.length === 0) return false
-    const heading = typeof title === 'string' && title.trim().length > 0 ? `【${title.trim()}】\n` : ''
+    // The card title is now the full question, so the quote heading needs its
+    // own short label instead of pushing the whole question into the input.
+    const safeTitle = truncate(String(title ?? '').trim(), 60)
+    const heading = safeTitle.length > 0 ? `【${safeTitle}】\n` : ''
     const value = `${heading}${body}`
     try {
       const actions = this.inputActions
@@ -605,7 +873,7 @@ export class CanvasStore {
       throw new Error('Composer is not accepting a quote')
     } catch {
       try {
-        navigator.clipboard?.writeText(quoteBlock(body, title)).catch(() => {})
+        navigator.clipboard?.writeText(quoteBlock(body, safeTitle)).catch(() => {})
       } catch {
         // ignore
       }
@@ -633,19 +901,35 @@ export class CanvasStore {
       if (this.board.cards.length === 0) {
         rootPosition = this.viewportCenter()
       } else {
-        const maxX = Math.max(...this.board.cards.map((card) => card.x + (card.width ?? CARD_WIDTH)))
+        const maxX = Math.max(...this.board.cards.map((card) => card.x + cardWidth(card)))
         const minY = Math.min(...this.board.cards.map((card) => card.y))
-        rootPosition = freePosition(this.board.cards, maxX + 120, minY)
+        rootPosition = freePosition(this.board.cards, maxX + CARD_GAP + 56, minY)
       }
 
       for (const group of fresh) {
         const parent = previous
-        const position = parent === undefined
-          ? rootPosition
-          : { x: parent.x, y: parent.y + 380 }
+        const collapsed = this.collapseAll
+        let position
+        if (this.snapToGrid) {
+          const width = collapsed ? CARD_WIDTH : EXPANDED_WIDTH
+          const height = collapsed ? CARD_HEIGHT : EXPANDED_HEIGHT
+          position = this.nearestFreeAnchor(
+            parent === undefined ? rootPosition.x : parent.x,
+            parent === undefined
+              ? rootPosition.y
+              : parent.y + cardHeight(parent) + CARD_GAP,
+            width,
+            height,
+            undefined,
+          )
+        } else {
+          position = parent === undefined
+            ? rootPosition
+            : { x: parent.x, y: parent.y + cardHeight(parent) + 96 }
+        }
         const card = this.addCard({
           type: 'answer',
-          title: truncate(group.question, 90),
+          title: '',
           question: group.question,
           content: group.content,
           reasoning: group.reasoning,
@@ -653,6 +937,7 @@ export class CanvasStore {
           requestId: group.requestId,
           status: group.status,
           imported: true,
+          collapsed,
           x: position.x,
           y: position.y,
           createdAt: Date.now(),
@@ -682,6 +967,7 @@ export class CanvasStore {
     if (this.selection === cardId) this.selection = undefined
     if (this.lastQuoteCardId === cardId) this.lastQuoteCardId = undefined
     if (this.readerCardId === cardId) this.readerCardId = undefined
+    if (this.draggingCardId === cardId) this.draggingCardId = undefined
     this.scrolls.delete(cardId)
     this.touch()
     this.setNotice('卡片已删除', 'info')
@@ -692,6 +978,7 @@ export class CanvasStore {
     this.selection = undefined
     this.lastQuoteCardId = undefined
     this.readerCardId = undefined
+    this.draggingCardId = undefined
     this.scrolls.clear()
     this.touch()
     this.setNotice('画布已清空', 'info')
@@ -707,9 +994,9 @@ export class CanvasStore {
 
   childPosition(parent) {
     const siblings = this.childrenOf(parent.id)
-    const parentHeight = this.heights.get(parent.id) ?? 280
-    const x = parent.x + (parent.width - CARD_WIDTH) / 2 + siblings.length * 36
-    const y = parent.y + parentHeight + 96 + siblings.length * 28
+    const parentHeight = cardHeight(parent)
+    const x = parent.x + (cardWidth(parent) - CARD_WIDTH) / 2 + siblings.length * 36
+    const y = parent.y + parentHeight + CARD_GAP + siblings.length * 28
     return freePosition(this.board.cards, x, y)
   }
 

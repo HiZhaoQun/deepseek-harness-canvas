@@ -1,5 +1,5 @@
 /** Small inline icon set for the canvas. All icons inherit currentColor. */
-import { h } from './runtime.js?v=2'
+import { h } from './runtime.js?v=6'
 
 const PATHS = {
   upload: [
@@ -41,6 +41,12 @@ const PATHS = {
     ['path', { d: 'M15 4h4a1 1 0 0 1 1 1v4' }],
     ['path', { d: 'M20 15v4a1 1 0 0 1-1 1h-4' }],
     ['path', { d: 'M9 20H5a1 1 0 0 1-1-1v-4' }],
+  ],
+  grid: [
+    ['rect', { x: 4, y: 4, width: 7, height: 7, rx: 1.5 }],
+    ['rect', { x: 13, y: 4, width: 7, height: 7, rx: 1.5 }],
+    ['rect', { x: 4, y: 13, width: 7, height: 7, rx: 1.5 }],
+    ['rect', { x: 13, y: 13, width: 7, height: 7, rx: 1.5 }],
   ],
   trash: [
     ['path', { d: 'M4 7h16' }],

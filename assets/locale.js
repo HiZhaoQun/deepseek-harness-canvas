@@ -1,11 +1,11 @@
 /**
  * Localized copy for Canvas mode.
  */
-import { useSyncExternalStore } from './runtime.js?v=2'
+import { useSyncExternalStore } from './runtime.js?v=6'
 
 // Versioned namespace: new keys must not be resolved from an older cached
 // registration of the same namespace.
-export const UI_NS = 'deepseekCanvasUiV1'
+export const UI_NS = 'deepseekCanvasUiV2'
 
 const EN = {
   'app.title': 'DeepSeek Canvas',
@@ -17,12 +17,14 @@ const EN = {
   'toolbar.importAll': 'Full history',
   'toolbar.importing': 'Importing…',
   'toolbar.note': 'New note',
+  'toolbar.collapseAll': 'Collapse all cards',
+  'toolbar.snap': 'Magnetic grid',
   'toolbar.fit': 'Fit view',
   'toolbar.help': 'Help',
   'controls.collapse': 'Collapse controls',
   'controls.expand': 'Expand controls',
   'toolbar.helpTitle': 'Canvas mode',
-  'toolbar.helpBody': 'Use the normal input box below. Select a card first to continue from that point; the answer becomes a child card. Select text inside a card to append a quote to the input box. Drag empty space to pan; Ctrl/⌘ + wheel to zoom.',
+  'toolbar.helpBody': 'Use the normal input box below. Select a card first to continue from that point; the answer becomes a child card. With no card selected, drag or use the wheel anywhere — even on a card — to pan the canvas. Select text inside a selected card to quote it. Ctrl/⌘ + wheel zooms. Cards are collapsed by default; collapsed cards skip live streaming so the board stays smooth. Magnetic grid lines up new and dropped cards.',
   'toolbar.zoomIn': 'Zoom in',
   'toolbar.zoomOut': 'Zoom out',
   'toolbar.zoomReset': 'Reset zoom to 100%',
@@ -101,12 +103,14 @@ const ZH = {
   'toolbar.importAll': '全部历史',
   'toolbar.importing': '正在导入…',
   'toolbar.note': '新建笔记',
+  'toolbar.collapseAll': '全部折叠',
+  'toolbar.snap': '网格磁吸',
   'toolbar.fit': '适应视图',
   'toolbar.help': '帮助',
   'controls.collapse': '收起控制栏',
   'controls.expand': '展开控制栏',
   'toolbar.helpTitle': '画布模式',
-  'toolbar.helpBody': '直接使用下方原来的输入框。先选中一张卡片，回答会作为它的子卡片；没有选中卡片时，第一条消息创建根卡片。在卡片中选中文字会自动把引用追加到输入框。拖拽空白平移，Ctrl/⌘ + 滚轮缩放。',
+  'toolbar.helpBody': '直接使用下方原来的输入框。先选中一张卡片，回答会作为它的子卡片；没有选中卡片时，在画布任意位置（包括卡片上）拖拽或滚动滚轮都会平移画布。在选中的卡片中选中文字会自动引用到输入框。Ctrl/⌘ + 滚轮缩放。卡片默认全部折叠；折叠的卡片不渲染流式回答，画面更流畅。开启网格磁吸后，新建和拖动后的卡片会吸附到预设网格。',
   'toolbar.zoomIn': '放大',
   'toolbar.zoomOut': '缩小',
   'toolbar.zoomReset': '恢复 100%',

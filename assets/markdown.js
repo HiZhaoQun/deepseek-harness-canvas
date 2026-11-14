@@ -1,6 +1,6 @@
 /** Safe, dependency-free Markdown rendering used by answer cards. */
-import { h, useState } from './runtime.js?v=2'
-import { Icon } from './icons.js?v=2'
+import { h, useState } from './runtime.js?v=6'
+import { Icon } from './icons.js?v=6'
 
 function isCjk(char) {
   return /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(char)

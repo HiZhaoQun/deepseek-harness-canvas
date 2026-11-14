@@ -6,7 +6,7 @@
  * answer card, and the assistant response for that turn fills it. No separate
  * prompt endpoint or model loop is used.
  */
-import { extractReasoning, extractText } from './model.js?v=2'
+import { extractReasoning, extractText } from './model.js?v=6'
 
 const RECONNECT_DELAYS = [600, 1200, 2400, 4800, 8000]
 

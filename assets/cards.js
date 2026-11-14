@@ -3,12 +3,13 @@ import {
   h,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
-} from './runtime.js?v=2'
-import { Icon } from './icons.js?v=2'
-import { Markdown, copyText } from './markdown.js?v=2'
-import { CARD_WIDTH, cardTitle, truncate } from './model.js?v=2'
+} from './runtime.js?v=6'
+import { Icon } from './icons.js?v=6'
+import { Markdown, copyText } from './markdown.js?v=6'
+import { cardHeight, cardTitle, cardWidth, plainPreview, truncate } from './model.js?v=6'
 
 function typeIcon(type) {
   return type === 'note' ? 'note' : 'answer'
@@ -88,6 +89,7 @@ function CardMenu({ store, card, t }) {
       className: 'dc-icon-button',
       title: t('card.menu'),
       'aria-label': t('card.menu'),
+      onClick: () => store.select(card.id),
     }, h(Icon, { name: 'more', size: 16 })),
     h('div', { className: 'dc-menu-popover', role: 'menu' },
       h('button', {
@@ -132,7 +134,7 @@ function CardMenu({ store, card, t }) {
         className: 'dc-menu-item',
         onClick: (event) => {
           closeDetails(event)
-          store.updateCard(card.id, { collapsed: !card.collapsed })
+          store.setCardCollapsed(card.id, !card.collapsed)
         },
       }, h(Icon, { name: card.collapsed ? 'expand' : 'collapse', size: 14 }),
       card.collapsed ? t('card.expand') : t('card.collapse')),
@@ -201,8 +203,30 @@ function NoteBody({ store, card, t }) {
         store.updateCardLive(card.id, { content: event.target.value })
       },
       onBlur: () => store.touch(),
-      onPointerDown: (event) => event.stopPropagation(),
+      onPointerDown: (event) => {
+        event.stopPropagation()
+        store.select(card.id)
+      },
     }),
+  )
+}
+
+/**
+ * Plain-text content preview shown in the collapsed 4:3 tile. Collapsed cards
+ * still skip live streaming, so this is cheap and only refreshes when the card
+ * actually re-renders.
+ */
+function CardPreview({ card, t }) {
+  const text = useMemo(() => plainPreview(card.content, 600), [card.content])
+  let fallback
+  if (card.status === 'waiting') fallback = t('card.waiting')
+  else if (card.status === 'streaming') fallback = t('card.streaming')
+  else if (card.status === 'error') fallback = card.error ?? t('card.error')
+  else if (card.status === 'interrupted') fallback = card.note ?? t('card.interrupted')
+  else if (card.type === 'note') fallback = t('note.placeholder')
+  else fallback = t('card.empty')
+  return h('div', { className: 'dc-card-preview' },
+    text.length > 0 ? text : h('span', { className: 'dc-muted' }, fallback),
   )
 }
 
@@ -214,26 +238,15 @@ export function CardShell({ store, card, t, zoom }) {
   const selected = store.selection === card.id
   const [dragging, setDragging] = useState(false)
   const dragRef = useRef(undefined)
-  const cardRef = useRef(null)
   const parent = card.parentId === null ? undefined : store.cardById(card.parentId)
   const children = store.childrenOf(card.id).length
-
-  useLayoutEffect(() => {
-    const element = cardRef.current
-    if (element === null) return undefined
-    const measure = () => {
-      const height = element.getBoundingClientRect().height / Math.max(0.01, zoom)
-      if (Number.isFinite(height) && height > 0) store.setHeight(card.id, height)
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [card.id, store, zoom])
 
   const onHeaderPointerDown = (event) => {
     if (event.button !== 0) return
     if (event.target.closest('button, summary, a, input, textarea, select')) return
+    // Without a selected card, dragging a card (header included) pans the
+    // board. Select the card first; the next drag moves it.
+    if (store.selection !== card.id) return
     event.preventDefault()
     event.stopPropagation()
     const target = event.currentTarget
@@ -243,14 +256,20 @@ export function CardShell({ store, card, t, zoom }) {
       startY: event.clientY,
       cardX: card.x,
       cardY: card.y,
+      moved: false,
     }
-    setDragging(true)
     store.select(card.id)
   }
 
   const onHeaderPointerMove = (event) => {
     const drag = dragRef.current
     if (drag === undefined) return
+    if (!drag.moved) {
+      if (Math.abs(event.clientX - drag.startX) < 3 && Math.abs(event.clientY - drag.startY) < 3) return
+      drag.moved = true
+      setDragging(true)
+      store.setDraggingCard(card.id)
+    }
     store.updateCardLive(card.id, {
       x: drag.cardX + (event.clientX - drag.startX) / zoom,
       y: drag.cardY + (event.clientY - drag.startY) / zoom,
@@ -258,7 +277,8 @@ export function CardShell({ store, card, t, zoom }) {
   }
 
   const endDrag = (event) => {
-    if (dragRef.current === undefined) return
+    const drag = dragRef.current
+    if (drag === undefined) return
     dragRef.current = undefined
     setDragging(false)
     try {
@@ -266,7 +286,13 @@ export function CardShell({ store, card, t, zoom }) {
     } catch {
       // ignore
     }
+    if (!drag.moved) {
+      store.setDraggingCard(undefined)
+      return
+    }
     store.touch()
+    store.snapCard(card.id)
+    store.setDraggingCard(undefined)
   }
 
   const anchorStyle = {
@@ -276,20 +302,16 @@ export function CardShell({ store, card, t, zoom }) {
   }
   const surfaceStyle = {
     zoom: String(zoom),
-    width: `${card.width ?? CARD_WIDTH}px`,
+    width: `${cardWidth(card)}px`,
+    height: `${cardHeight(card)}px`,
   }
 
   return h('div', { className: 'dc-card-anchor', style: anchorStyle },
     h('article', {
-      ref: cardRef,
       className: `dc-card dc-card-${card.type}${selected ? ' dc-card-selected' : ''}${card.collapsed ? ' dc-card-collapsed' : ''}${dragging ? ' dc-card-dragging' : ''}`,
       style: surfaceStyle,
       'data-card-id': card.id,
       'aria-label': `${typeLabel(card.type, t)}: ${cardTitle(card, t('card.untitled'))}`,
-      onPointerDown: (event) => {
-        if (event.target.closest('button, summary, a, input, textarea, select')) return
-        store.select(card.id)
-      },
       onClick: (event) => {
         if (event.target.closest('button, summary, a, textarea, input, .dc-menu-popover')) return
         store.select(card.id)
@@ -297,6 +319,7 @@ export function CardShell({ store, card, t, zoom }) {
       onDoubleClick: (event) => {
         if (event.target.closest('button, summary, a, textarea, input, select, .dc-menu-popover')) return
         event.stopPropagation()
+        store.select(card.id)
         store.openReader(card.id)
       },
     },
@@ -311,7 +334,7 @@ export function CardShell({ store, card, t, zoom }) {
     h('div', { className: 'dc-card-heading' },
       h('div', { className: 'dc-card-title' }, cardTitle(card, t('card.untitled'))),
       h('div', { className: 'dc-card-subtitle' },
-        parent !== undefined ? t('card.parent', { title: cardTitle(parent, t('card.untitled')) }) : null,
+        parent !== undefined ? t('card.parent', { title: truncate(cardTitle(parent, t('card.untitled')), 48) }) : null,
         children > 0 ? ` · ${t('card.children', { count: children })}` : null,
         card.type === 'answer' ? ` · ${statusLabel(card, t)}` : null,
       ),
@@ -325,13 +348,14 @@ export function CardShell({ store, card, t, zoom }) {
         'aria-expanded': !card.collapsed,
         onClick: (event) => {
           event.stopPropagation()
-          store.updateCard(card.id, { collapsed: !card.collapsed })
+          store.select(card.id)
+          store.setCardCollapsed(card.id, !card.collapsed)
         },
       }, h(Icon, { name: card.collapsed ? 'expand' : 'collapse', size: 16 })),
       h(CardMenu, { store, card, t }),
     ),
   ),
-  card.collapsed ? null : (card.type === 'note'
+  card.collapsed ? h(CardPreview, { card, t }) : (card.type === 'note'
     ? h(NoteBody, { store, card, t })
     : h(AnswerBody, { store, card, t })),
     ),
