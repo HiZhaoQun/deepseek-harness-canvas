@@ -9,3 +9,6 @@ promo/frames/
 promo/stills/
 promo/tmp/
 promo/harness-canvas-promo.mp4
+promo/capture/out/
+promo/capture/react.js
+promo/capture/react-dom.js

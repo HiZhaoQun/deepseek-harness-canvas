@@ -8,7 +8,7 @@ $node = 'C:\Users\HiZhaoQun\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\n
 $ffmpeg = 'C:\ProgramData\chocolatey\bin\ffmpeg.exe'
 
 $fps = 30
-$duration = 55
+$duration = 58
 $port = 9224
 $frames = Join-Path $promo 'frames'
 $out = Join-Path $promo 'harness-canvas-promo.mp4'
@@ -33,7 +33,9 @@ try {
   Write-Host "frames=$count renderSeconds=$renderSeconds"
 
   & $ffmpeg -y -hide_banner -loglevel error -framerate $fps -i (Join-Path $frames '%05d.jpg') `
-    -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart -an $out
+    -vf "scale=in_range=full:out_range=limited:flags=lanczos,format=yuv420p" `
+    -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv `
+    -c:v libx264 -preset slow -crf 18 -movflags +faststart -an $out
   if ($LASTEXITCODE -ne 0) { throw "ffmpeg failed with exit code $LASTEXITCODE" }
 
   $file = Get-Item $out

@@ -12,7 +12,7 @@ DeepSeek Harness Canvas 是一个将普通对话变成无限卡片树的 DeepSee
 
 > 当前版本：`1.0.0`，第一版公开版本。
 
-![画布模式：选中父卡片继续提问，回答成为它的子卡片](docs/images/03-parent-child-cards.png)
+![画布模式：选中父卡片继续提问，回答成为它的子卡片](docs/images/canvas-branch.png)
 
 ## 功能
 
@@ -34,17 +34,21 @@ DeepSeek Harness Canvas 是一个将普通对话变成无限卡片树的 DeepSee
 
 ## 界面预览
 
-以下截图来自插件在 DeepSeek Harness 桌面端 `画布` 视图中的实际运行界面。
+以下截图来自插件在 DeepSeek Harness `画布` 视图中的实际运行界面（由插件自身代码渲染）。
 
-| 打开画布：空状态 | 第一个问题生成根卡片 |
+| 全部折叠：4:3 瓦片与连线 | 选中卡片，回答成为子卡片 |
 | --- | --- |
-| ![打开画布后的空状态，右侧为控制栏，底部仍是 Harness 原有的输入框](docs/images/01-empty-canvas.png) | ![发送第一个问题后生成的根卡片，卡片内含问题与回答](docs/images/02-conversation-card.png) |
+| ![画布上的折叠卡片瓦片，卡片之间以曲线相连](docs/images/canvas-tiles.png) | ![选中的父卡片与它的子卡片，之间有一条连线](docs/images/canvas-branch.png) |
 
-| 导入历史对话 | 放大阅读并引用提问 |
+| 展开卡占据 2×2 槽位 | 拖动时显示槽位并磁吸 |
 | --- | --- |
-| ![右侧控制栏展开「导入对话」，可选最近 20 轮或全部历史](docs/images/04-import-history.png) | ![双击卡片打开全屏阅读面板，卡片中的引用已自动填入底部输入框](docs/images/05-reader-and-quote.png) |
+| ![一张展开的卡片，正文在卡片内滚动，周围是折叠瓦片](docs/images/canvas-expanded.png) | ![拖动卡片时画布显示预设槽位，并高亮最近的落点](docs/images/canvas-snap.png) |
 
-选中一张卡片后再提问，回答会成为它的子卡片，两张卡片之间自动画出连线——这就是顶部主图展示的效果。
+双击卡片会打开全屏阅读面板，问题与回答按对话形式展开：
+
+![全屏阅读面板，左侧为问题，右侧为回答正文](docs/images/canvas-reader.png)
+
+选中一张卡片后再提问，回答会成为它的子卡片——这就是顶部主图展示的效果。
 
 ## 安装
 
